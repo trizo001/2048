@@ -1,4 +1,4 @@
-const CACHE = "zwei048-v1";
+const CACHE = "zwei048-v2";
 const FILES = ["./", "index.html", "manifest.webmanifest", "apple-touch-icon.png", "icon-512.png"];
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));

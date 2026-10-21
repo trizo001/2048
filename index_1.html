@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>2048</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="2048">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#eceff3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10151b" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  body { margin: 0; }
+</style>
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:wght@400;500;700&display=swap">
+<style>
+  /* Layout: one centered column, header on top, square board, hint below. Fits one phone screen. */
+  :root {
+    --bg: #eceff3;
+    --board: #c3ccd6;
+    --cell: #d6dde5;
+    --fg: #17212b;
+    --muted: #5a6877;
+    --accent: #0f766e;
+    --accent-fg: #ffffff;
+    --panel: #ffffff;
+    --veil: rgba(236, 239, 243, 0.86);
+    --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    --font-body: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #10151b;
+      --board: #232c37;
+      --cell: #1a222b;
+      --fg: #e7ecf1;
+      --muted: #94a1af;
+      --accent: #2dd4bf;
+      --accent-fg: #06201c;
+      --panel: #1a222b;
+      --veil: rgba(16, 21, 27, 0.86);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #10151b;
+    --board: #232c37;
+    --cell: #1a222b;
+    --fg: #e7ecf1;
+    --muted: #94a1af;
+    --accent: #2dd4bf;
+    --accent-fg: #06201c;
+    --panel: #1a222b;
+    --veil: rgba(16, 21, 27, 0.86);
+    color-scheme: dark;
+  }
+
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    padding-block: 12px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+  }
+  .game { width: min(100%, 460px); display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+  header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: clamp(2.6rem, 14vw, 3.6rem);
+    line-height: 0.9;
+    letter-spacing: -0.04em;
+    margin: 0;
+  }
+  .scores { display: flex; gap: 8px; }
+  .score {
+    background: var(--board);
+    border-radius: 10px;
+    padding: 6px 12px;
+    min-width: 76px;
+    text-align: center;
+  }
+  .score small { display: block; font-size: 0.66rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+  .score b { font-family: var(--font-display); font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+
+  .bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .bar p { margin: 0; color: var(--muted); font-size: 0.95rem; line-height: 1.35; }
+  .btns { display: flex; gap: 8px; flex-shrink: 0; }
+  button {
+    font: inherit;
+    font-weight: 700;
+    font-size: 0.92rem;
+    border: 0;
+    border-radius: 10px;
+    padding: 10px 14px;
+    background: var(--accent);
+    color: var(--accent-fg);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  button.ghost { background: var(--board); color: var(--fg); }
+  button:disabled { opacity: 0.4; cursor: default; }
+  button:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+
+  .wrap { width: 100%; aspect-ratio: 1; container-type: inline-size; }
+  .board {
+    --g: 3cqw;
+    --s: calc((100cqw - 5 * var(--g)) / 4);
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: var(--board);
+    border-radius: 3.2cqw;
+    overflow: hidden;
+  }
+  .cells { position: absolute; inset: var(--g); display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--g); }
+  .cells i { background: var(--cell); border-radius: 2cqw; }
+  .tile {
+    position: absolute;
+    left: var(--g);
+    top: var(--g);
+    width: var(--s);
+    height: var(--s);
+    transform: translate(calc(var(--c) * (var(--s) + var(--g))), calc(var(--r) * (var(--s) + var(--g))));
+    transition: transform 110ms ease-out;
+  }
+  .face {
+    width: 100%;
+    height: 100%;
+    border-radius: 2cqw;
+    display: grid;
+    place-items: center;
+    font-family: var(--font-display);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    font-size: 9.5cqw;
+  }
+  .face.d3 { font-size: 7.8cqw; }
+  .face.d4 { font-size: 6.4cqw; }
+  .face.d5 { font-size: 5.2cqw; }
+  .tile.fresh .face { animation: appear 160ms 100ms ease-out backwards; }
+  .tile.merge .face { animation: pop 170ms ease-out; }
+  @keyframes appear { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes pop { 0% { transform: scale(0.85); } 55% { transform: scale(1.14); } 100% { transform: scale(1); } }
+
+  .veil {
+    position: absolute;
+    inset: 0;
+    background: var(--veil);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    text-align: center;
+    padding: 16px;
+  }
+  .veil h2 { font-family: var(--font-display); font-size: 2.1rem; letter-spacing: -0.03em; margin: 0; }
+  .veil p { margin: 0; color: var(--muted); }
+  .veil .btns { justify-content: center; }
+  [hidden] { display: none !important; }
+  .hint { text-align: center; color: var(--muted); font-size: 0.85rem; margin: 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tile { transition: none; }
+    .tile.fresh .face, .tile.merge .face { animation: none; }
+  }
+</style>
+
+<main class="game">
+  <header>
+    <h1>2048</h1>
+    <div class="scores">
+      <div class="score"><small>Punkte</small><b id="score">0</b></div>
+      <div class="score"><small>Rekord</small><b id="best">0</b></div>
+    </div>
+  </header>
+
+  <div class="bar">
+    <p>Verbinde gleiche Zahlen und erreiche die 2048.</p>
+    <div class="btns">
+      <button id="undo" class="ghost" type="button" aria-label="Letzten Zug rückgängig machen">Zurück</button>
+      <button id="restart" type="button">Neu</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="board" id="board">
+      <div class="cells"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div id="tiles"></div>
+      <div class="veil" id="veil" hidden>
+        <h2 id="veil-title"></h2>
+        <p id="veil-text"></p>
+        <div class="btns" id="veil-btns"></div>
+      </div>
+    </div>
+  </div>
+
+  <p class="hint">Wische in eine Richtung. Am Rechner gehen auch die Pfeiltasten.</p>
+</main>
+
+<script>
+//LOGIC-START
+var N = 4;
+function emptyGrid() { return Array.from({ length: N }, function () { return Array(N).fill(0); }); }
+function copyGrid(g) { return g.map(function (row) { return row.slice(); }); }
+
+// dir: 0 links, 1 hoch, 2 rechts, 3 runter
+function slide(grid, dir) {
+  var res = { grid: emptyGrid(), gained: 0, moved: false, moves: [] };
+  for (var i = 0; i < N; i++) {
+    var coords = [];
+    for (var j = 0; j < N; j++) {
+      var r, c;
+      if (dir === 0) { r = i; c = j; }
+      else if (dir === 2) { r = i; c = N - 1 - j; }
+      else if (dir === 1) { r = j; c = i; }
+      else { r = N - 1 - j; c = i; }
+      coords.push([r, c]);
+    }
+    var w = 0, prev = null;
+    for (var k = 0; k < N; k++) {
+      var fr = coords[k][0], fc = coords[k][1], v = grid[fr][fc];
+      if (!v) continue;
+      if (prev && prev.v === v && !prev.merged) {
+        var tm = coords[prev.w];
+        res.grid[tm[0]][tm[1]] = v * 2;
+        res.gained += v * 2;
+        res.moves[prev.idx].merge = true;
+        res.moves.push({ fr: fr, fc: fc, tr: tm[0], tc: tm[1], merge: true });
+        prev.merged = true;
+        res.moved = true;
+      } else {
+        var tt = coords[w];
+        res.grid[tt[0]][tt[1]] = v;
+        res.moves.push({ fr: fr, fc: fc, tr: tt[0], tc: tt[1], merge: false });
+        if (tt[0] !== fr || tt[1] !== fc) res.moved = true;
+        prev = { v: v, w: w, merged: false, idx: res.moves.length - 1 };
+        w++;
+      }
+    }
+  }
+  return res;
+}
+
+function canMove(grid) {
+  for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) {
+    if (!grid[r][c]) return true;
+    if (c + 1 < N && grid[r][c] === grid[r][c + 1]) return true;
+    if (r + 1 < N && grid[r][c] === grid[r + 1][c]) return true;
+  }
+  return false;
+}
+function maxTile(grid) { return Math.max.apply(null, [].concat.apply([], grid)); }
+//LOGIC-END
+
+(function () {
+  var KEY = 'zwei048-state-v1';
+  var grid, score = 0, best = 0, prev = null, tiles = [], locked = false, won = false, keepGoing = false;
+  var layer = document.getElementById('tiles');
+  var scoreEl = document.getElementById('score');
+  var bestEl = document.getElementById('best');
+  var undoBtn = document.getElementById('undo');
+  var veil = document.getElementById('veil');
+
+  function paint(face, v) {
+    var n = Math.log2(v);
+    var hue = Math.max(15, 205 - n * 15);
+    var light = v <= 4 ? 90 - n * 5 : 62 - Math.min(n, 11) * 1.4;
+    face.style.background = 'hsl(' + hue + ' ' + (v <= 4 ? 28 : 62) + '% ' + light + '%)';
+    face.style.color = v <= 4 ? '#22303d' : '#ffffff';
+    face.textContent = v;
+    face.className = 'face d' + Math.min(5, String(v).length);
+  }
+  function place(t) { t.el.style.setProperty('--r', t.r); t.el.style.setProperty('--c', t.c); }
+  function createTile(r, c, v, cls) {
+    var el = document.createElement('div');
+    el.className = 'tile' + (cls ? ' ' + cls : '');
+    var face = document.createElement('div');
+    paint(face, v);
+    el.appendChild(face);
+    var t = { el: el, r: r, c: c, v: v };
+    place(t);
+    layer.appendChild(el);
+    tiles.push(t);
+    return t;
+  }
+  function rebuild() {
+    layer.innerHTML = '';
+    tiles = [];
+    for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) if (grid[r][c]) createTile(r, c, grid[r][c]);
+  }
+  function addRandom(animate) {
+    var free = [];
+    for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) if (!grid[r][c]) free.push([r, c]);
+    if (!free.length) return;
+    var p = free[Math.floor(Math.random() * free.length)];
+    var v = Math.random() < 0.9 ? 2 : 4;
+    grid[p[0]][p[1]] = v;
+    createTile(p[0], p[1], v, animate ? 'fresh' : '');
+  }
+  function updateScores() {
+    if (score > best) best = score;
+    scoreEl.textContent = score;
+    bestEl.textContent = best;
+    undoBtn.disabled = !prev;
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify({ grid: grid, score: score, best: best, won: won, keepGoing: keepGoing })); } catch (e) {}
+  }
+  function showVeil(title, text, buttons) {
+    document.getElementById('veil-title').textContent = title;
+    document.getElementById('veil-text').textContent = text;
+    var box = document.getElementById('veil-btns');
+    box.innerHTML = '';
+    buttons.forEach(function (b) {
+      var el = document.createElement('button');
+      el.type = 'button';
+      el.textContent = b.label;
+      if (b.ghost) el.className = 'ghost';
+      el.addEventListener('click', b.fn);
+      box.appendChild(el);
+    });
+    veil.hidden = false;
+  }
+  function hideVeil() { veil.hidden = true; }
+
+  function check() {
+    if (!keepGoing && maxTile(grid) >= 2048) {
+      won = true;
+      showVeil('2048 geschafft!', 'Punkte: ' + score, [
+        { label: 'Weiterspielen', fn: function () { keepGoing = true; hideVeil(); save(); } },
+        { label: 'Neu starten', ghost: true, fn: newGame }
+      ]);
+    } else if (!canMove(grid)) {
+      showVeil('Keine Züge mehr', 'Punkte: ' + score, [{ label: 'Nochmal', fn: newGame }]);
+    }
+  }
+
+  function newGame() {
+    grid = emptyGrid();
+    score = 0; prev = null; won = false; keepGoing = false; locked = false;
+    hideVeil();
+    layer.innerHTML = ''; tiles = [];
+    addRandom(true); addRandom(true);
+    updateScores(); save();
+  }
+
+  function move(dir) {
+    if (locked || !veil.hidden) return;
+    var res = slide(grid, dir);
+    if (!res.moved) return;
+    prev = { grid: copyGrid(grid), score: score };
+    grid = res.grid;
+    score += res.gained;
+    var byPos = new Map(tiles.map(function (t) { return [t.r * N + t.c, t]; }));
+    var dying = [], mergeCells = new Set();
+    res.moves.forEach(function (m) {
+      var t = byPos.get(m.fr * N + m.fc);
+      t.r = m.tr; t.c = m.tc; place(t);
+      if (m.merge) { dying.push(t); mergeCells.add(m.tr * N + m.tc); }
+    });
+    tiles = tiles.filter(function (t) { return dying.indexOf(t) < 0; });
+    addRandom(true);
+    updateScores(); save();
+    locked = true;
+    setTimeout(function () {
+      dying.forEach(function (t) { t.el.remove(); });
+      mergeCells.forEach(function (k) {
+        var r = Math.floor(k / N), c = k % N;
+        createTile(r, c, grid[r][c], 'merge');
+      });
+      locked = false;
+      check();
+    }, 115);
+  }
+
+  function undo() {
+    if (!prev || locked) return;
+    grid = prev.grid; score = prev.score; prev = null;
+    hideVeil();
+    rebuild(); updateScores(); save();
+  }
+
+  document.getElementById('restart').addEventListener('click', newGame);
+  undoBtn.addEventListener('click', undo);
+
+  var keys = { ArrowLeft: 0, ArrowUp: 1, ArrowRight: 2, ArrowDown: 3, a: 0, w: 1, d: 2, s: 3 };
+  document.addEventListener('keydown', function (e) {
+    if (e.key in keys) { e.preventDefault(); move(keys[e.key]); }
+  });
+
+  var sx = 0, sy = 0, tracking = false;
+  document.addEventListener('touchstart', function (e) {
+    if (e.target.closest('button')) { tracking = false; return; }
+    var t = e.touches[0]; sx = t.clientX; sy = t.clientY; tracking = true;
+  }, { passive: true });
+  document.addEventListener('touchmove', function (e) { if (tracking) e.preventDefault(); }, { passive: false });
+  document.addEventListener('touchend', function (e) {
+    if (!tracking) return;
+    tracking = false;
+    var t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+    if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 2 : 0); else move(dy > 0 ? 3 : 1);
+  }, { passive: true });
+
+  // Start: gespeicherten Spielstand laden, sonst neues Spiel
+  var saved = null;
+  try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
+  if (saved && saved.grid && saved.grid.length === N) {
+    grid = saved.grid; score = saved.score || 0; best = saved.best || 0;
+    won = !!saved.won; keepGoing = !!saved.keepGoing;
+    rebuild(); updateScores();
+    if (!canMove(grid)) check();
+  } else {
+    if (saved && saved.best) best = saved.best;
+    newGame();
+  }
+})();
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+}
+</script>
+</body>
+</html>
